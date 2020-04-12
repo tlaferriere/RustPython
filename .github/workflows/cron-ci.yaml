@@ -56,3 +56,43 @@ jobs:
         uses: codecov/codecov-action@v1
         with:
           file: ${{ steps.coverage.outputs.report }}
+
+  testdata:
+    name: Collect regression test data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: build rustpython
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --verbose --all
+      - name: collect tests data
+        run: cargo run --release tests/jsontests.py
+        env:
+          RUSTPYTHONPATH: ${{ github.workspace }}/Lib
+      - name: upload tests data to the website
+        env:
+          SSHKEY: ${{ secrets.ACTIONS_TESTS_DATA_DEPLOY_KEY }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          # based on https://github.com/peaceiris/actions-gh-pages/blob/master/src/set-tokens.ts
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t rsa github.com >>~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          echo "$SSHKEY" >~/.ssh/github
+          chmod 600 ~/.ssh/github
+          cat >~/.ssh/config <<EOF
+          Host github
+              HostName github.com
+              IdentityFile ~/.ssh/github
+              User git
+          EOF
+
+          git clone git@github.com:RustPython/rustpython.github.io.git website
+          cd website
+          cp ../tests/cpython_tests_results.json ./_data/regrtests_results.json
+          git add ./_data/regrtests_results.json
+          git -c user.name="Github Actions" -c user.email="actions@github.com" commit -m "Update regression test results" --author="$GITHUB_ACTOR"
+          git push
