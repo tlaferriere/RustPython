@@ -716,8 +716,8 @@ fn builtin_setattr(
 // builtin_slice
 
 fn builtin_sorted(vm: &VirtualMachine, mut args: PyFuncArgs) -> PyResult {
-    arg_check!(vm, args, required = [(iterable, None)]);
-    let items = vm.extract_elements(iterable)?;
+    let iterable: PyObjectRef = args.clone().bind(vm)?;
+    let items = vm.extract_elements(&iterable)?;
     let lst = vm.ctx.new_list(items);
 
     args.shift();
